@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EquityLens — Stock Valuation Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#060610;--surface:#0d0d1a;--surface2:#13132a;--surface3:#1a1a35;--border:#1e1e3f;--border2:#2a2a50;--blue:#4f8ef7;--blue-dim:#1e3a6e;--green:#00d084;--green-dim:#003d22;--red:#ff4d6d;--red-dim:#3d0015;--amber:#ffb347;--amber-dim:#3d2a00;--purple:#a78bfa;--text:#e8e8f5;--text2:#9090b8;--mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(79,142,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(79,142,247,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.header{position:sticky;top:0;z-index:100;background:rgba(6,6,16,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 2rem;height:60px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px;font-size:1.1rem;font-weight:700;letter-spacing:-.5px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.logo span{color:var(--blue)}
+.header-right{display:flex;align-items:center;gap:10px}
+.api-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:.75rem;color:var(--text2);cursor:pointer;transition:all .2s}
+.api-badge:hover{border-color:var(--blue);color:var(--blue)}
+.api-dot{width:6px;height:6px;border-radius:50%;background:var(--red)}
+.api-dot.connected{background:var(--green)}
+.demo-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(255,179,71,.1);border:1px solid var(--amber);border-radius:20px;font-size:.72rem;color:var(--amber);font-weight:600}
+.search-section{position:relative;z-index:1;padding:1.5rem 2rem 0;max-width:1400px;margin:0 auto}
+.search-bar{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:12px 20px;transition:border-color .2s}
+.search-bar:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,142,247,.1)}
+.search-bar input{flex:1;background:transparent;border:none;outline:none;font-family:var(--mono);font-size:1.4rem;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:2px}
+.search-bar input::placeholder{color:var(--text2);letter-spacing:1px;font-size:1rem;font-weight:400;text-transform:none}
+.search-btn{background:linear-gradient(135deg,var(--blue),#6366f1);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-family:var(--sans);font-weight:600;font-size:.9rem;cursor:pointer;transition:all .2s;white-space:nowrap}
+.search-btn:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(79,142,247,.4)}
+.search-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.mode-toggle{display:flex;gap:6px}
+.mode-btn{padding:6px 14px;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text2);transition:all .2s}
+.mode-btn.active{background:rgba(255,179,71,.15);border-color:var(--amber);color:var(--amber)}
+.mode-btn.active.live{background:rgba(79,142,247,.15);border-color:var(--blue);color:var(--blue)}
+.recent-tickers{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.ticker-chip{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 12px;font-family:var(--mono);font-size:.75rem;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+.ticker-chip:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+.error-bar{display:none;background:rgba(255,77,109,.1);border:1px solid var(--red);border-radius:10px;padding:12px 20px;margin-top:12px;font-size:.82rem;color:var(--red);display:flex;align-items:center;gap:10px}
+.error-bar.hidden{display:none!important}
+.info-bar{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);border-radius:10px;padding:10px 20px;margin-top:10px;font-size:.78rem;color:var(--amber);line-height:1.6}
+.main{max-width:1400px;margin:0 auto;padding:1.5rem 2rem 5rem;position:relative;z-index:1}
+.hero-strip{display:grid;grid-template-columns:2fr repeat(5,1fr);gap:1px;background:var(--border);border-radius:12px;overflow:hidden;margin-bottom:1.5rem;border:1px solid var(--border)}
+.hero-cell{background:var(--surface);padding:1.2rem 1.5rem}
+.hero-cell.main-price{background:var(--surface2)}
+.hero-label{font-size:.7rem;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.hero-value{font-family:var(--mono);font-size:1.5rem;font-weight:600;color:var(--text)}
+.hero-cell.main-price .hero-value{font-size:2.2rem}
+.hero-company{font-size:.8rem;color:var(--text2);margin-top:2px}
+.change-positive{color:var(--green)}.change-negative{color:var(--red)}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.tab{padding:10px 20px;font-size:.85rem;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--text)}.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;margin-bottom:1.5rem}
+.card:hover{border-color:var(--border2)}
+.card-header{padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text2);display:flex;align-items:center;gap:8px}
+.card-title-accent{width:3px;height:14px;background:var(--blue);border-radius:2px}
+.card-body{padding:1.5rem}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.metric-cell{background:var(--surface);padding:1rem;position:relative}
+.metric-label{font-size:.7rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.metric-value{font-family:var(--mono);font-size:1.05rem;font-weight:500;color:var(--text)}
+.score-container{display:flex;align-items:center;gap:2rem}
+.score-circle{position:relative;width:120px;height:120px;flex-shrink:0}
+.score-canvas{width:120px;height:120px}
+.score-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-number{font-family:var(--mono);font-size:1.8rem;font-weight:700;line-height:1}
+.score-label{font-size:.6rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.slider-group{margin-bottom:1rem}
+.slider-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.slider-label{font-size:.8rem;color:var(--text2)}
+.slider-value{font-family:var(--mono);font-size:.85rem;font-weight:600;color:var(--blue)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;background:var(--border2);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--blue);border-radius:50%;cursor:pointer;box-shadow:0 0 8px rgba(79,142,247,.5)}
+.dcf-result-card{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:1.5rem;text-align:center}
+.dcf-label{font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.dcf-value{font-family:var(--mono);font-size:2rem;font-weight:700;margin:4px 0}
+.verdict-badge{display:inline-block;padding:6px 16px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.verdict-undervalued{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+.verdict-overvalued{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+.verdict-fair{background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber)}
+.sensitivity-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.72rem}
+.sensitivity-table th{padding:6px 8px;text-align:center;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border)}
+.sensitivity-table td{padding:6px 8px;text-align:center;border:1px solid rgba(255,255,255,.04)}
+.sensitivity-table td.row-header{color:var(--text2);font-weight:500;background:var(--surface2)}
+.risk-meter{height:8px;background:var(--border2);border-radius:4px;overflow:hidden;margin-top:6px}
+.risk-fill{height:100%;border-radius:4px;transition:width .5s ease;background:linear-gradient(90deg,var(--green),var(--amber),var(--red))}
+.check-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+.check-item:last-child{border-bottom:none}
+.check-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.check-dot.pass{background:var(--green)}.check-dot.fail{background:var(--red)}
+.scenario-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem}
+.scenario-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1.2rem;text-align:center}
+.scenario-card.bear{border-top:2px solid var(--red)}.scenario-card.base{border-top:2px solid var(--amber)}.scenario-card.bull{border-top:2px solid var(--green)}
+.scenario-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.scenario-price{font-family:var(--mono);font-size:1.4rem;font-weight:700}
+.scenario-return{font-size:.8rem;color:var(--text2);margin-top:4px}
+.grade-display{text-align:center;padding:2rem}
+.grade-letter{font-family:var(--mono);font-size:5rem;font-weight:700;line-height:1;background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.score-bar-item{margin-bottom:14px}
+.score-bar-header{display:flex;justify-content:space-between;margin-bottom:5px;font-size:.8rem}
+.score-bar-track{height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--purple));transition:width .5s ease}
+.tooltip{position:relative;display:inline-block}
+.tooltip:hover .tooltip-text{visibility:visible;opacity:1}
+.tooltip-text{visibility:hidden;opacity:0;width:200px;background:#1a1a35;border:1px solid var(--border2);color:var(--text);font-size:.72rem;line-height:1.5;border-radius:8px;padding:8px 12px;position:absolute;z-index:1000;bottom:125%;left:50%;transform:translateX(-50%);transition:opacity .15s;pointer-events:none}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(10px);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:2rem;width:90%;max-width:500px;transform:translateY(-20px);transition:transform .2s}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-title{font-size:1.1rem;font-weight:700;margin-bottom:.5rem}
+.modal-desc{font-size:.82rem;color:var(--text2);margin-bottom:1.5rem;line-height:1.6}
+.modal input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:.9rem;color:var(--text);outline:none;margin-bottom:1rem;transition:border-color .2s}
+.modal input:focus{border-color:var(--blue)}
+.modal-buttons{display:flex;gap:10px}
+.btn-primary{flex:1;background:linear-gradient(135deg,var(--blue),#6366f1);color:#fff;border:none;padding:10px;border-radius:8px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:opacity .2s}
+.btn-primary:hover{opacity:.9}
+.btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border);padding:10px 20px;border-radius:8px;font-family:var(--sans);cursor:pointer;transition:all .2s}
+.btn-secondary:hover{border-color:var(--blue);color:var(--blue)}
+.number-input-group{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;width:100%}
+.number-input-group input{flex:1;background:transparent;border:none;outline:none;padding:8px 12px;font-family:var(--mono);font-size:.9rem;color:var(--text);min-width:0}
+.number-input-group span{padding:0 10px;color:var(--text2);font-size:.8rem;font-family:var(--mono);border-left:1px solid var(--border)}
+.form-label{font-size:.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block}
+.form-group{margin-bottom:1rem}
+.z-score-display{display:flex;align-items:center;gap:1.5rem;padding:1.2rem;background:var(--surface2);border-radius:10px;border:1px solid var(--border)}
+.z-score-num{font-family:var(--mono);font-size:2rem;font-weight:700;flex-shrink:0}
+.sep{height:1px;background:var(--border);margin:1.5rem 0}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.83rem}
+.stat-row:last-child{border-bottom:none}
+.stat-key{color:var(--text2)}.stat-val{font-family:var(--mono);font-weight:500}
+.export-bar{display:flex;gap:10px;margin-top:2rem}
+.export-btn{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:8px;font-family:var(--sans);font-size:.85rem;cursor:pointer;transition:all .2s}
+.export-btn:hover{border-color:var(--blue);color:var(--blue)}
+.blended-result{background:linear-gradient(135deg,rgba(79,142,247,.1),rgba(99,102,241,.1));border:1px solid rgba(79,142,247,.3);border-radius:12px;padding:1.5rem;text-align:center}
+.empty-state{text-align:center;padding:5rem 2rem;color:var(--text2)}
+.empty-state-icon{font-size:3rem;margin-bottom:1rem;opacity:.5}
+.empty-state-title{font-size:1.1rem;font-weight:600;color:var(--text);margin-bottom:8px}
+.empty-state-desc{font-size:.85rem;line-height:1.6}
+.disclaimer{position:fixed;bottom:0;left:0;right:0;background:rgba(6,6,16,.95);border-top:1px solid var(--border);padding:8px 2rem;font-size:.68rem;color:var(--text2);text-align:center;z-index:50}
+@media(max-width:768px){.hero-strip{grid-template-columns:1fr 1fr}.grid-2,.grid-3{grid-template-columns:1fr}.scenario-grid{grid-template-columns:1fr}.metrics-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">📈</div>
+    Equity<span>Lens</span>
+  </div>
+  <div class="header-right">
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="demoModeBtn" onclick="setMode('demo')">📊 Demo</button>
+      <button class="mode-btn live active" id="liveModeBtn" onclick="setMode('live')" style="display:none">🔴 Live API</button>
+    </div>
+    <div class="api-badge" onclick="openApiModal()">
+      <div class="api-dot" id="apiDot"></div>
+      <span id="apiStatus">Add API Key</span>
+    </div>
+  </div>
+</header>
+
+<!-- API MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <div class="modal-title">🔑 Financial Modeling Prep API Key</div>
+    <div class="modal-desc">
+      Zaregistruj sa zadarmo na <a href="https://financialmodelingprep.com" target="_blank" style="color:var(--blue)">financialmodelingprep.com</a> a získaj API key (free tier = 250 calls/deň).<br><br>
+      <strong style="color:var(--amber)">⚠️ Dôležité:</strong> Live API funguje len keď súbor otvoríš lokálne v prehliadači alebo nasadíš na Vercel/GitHub Pages. Vnútri Claude sandboxu sú externé volania blokované — preto používaj Demo režim na testovanie UI.
+    </div>
+    <input type="text" id="apiKeyInput" placeholder="Vlož FMP API key..." />
+    <div class="modal-buttons">
+      <button class="btn-primary" onclick="saveApiKey()">Uložiť & Pripojiť</button>
+      <button class="btn-secondary" onclick="closeApiModal()">Zrušiť</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH -->
+<div class="search-section">
+  <div class="search-bar">
+    <span style="color:var(--text2);font-size:1.2rem">🔍</span>
+    <input type="text" id="tickerInput" placeholder="Zadaj ticker — AAPL, MSFT, GOOG, NVDA, AMZN..." maxlength="10"
+      onkeydown="if(event.key==='Enter')analyzeStock()">
+    <button class="search-btn" onclick="analyzeStock()" id="searchBtn">Analyze</button>
+  </div>
+  <div class="info-bar" id="modeInfoBar">
+    📊 <strong>Demo režim</strong> — Reálne dáta (AAPL, MSFT, GOOG, NVDA, AMZN, AVGO, MA, V). Pre živé API dáta: otvor súbor lokálne v prehliadači + vlož API key → prepne sa automaticky na Live mode.
+  </div>
+  <div class="error-bar hidden" id="errorBar">⚠️ <span id="errorMsg"></span></div>
+  <div class="recent-tickers" id="recentTickers"></div>
+</div>
+
+<main class="main" id="mainContent">
+  <div class="empty-state" id="emptyState">
+    <div class="empty-state-icon">📊</div>
+    <div class="empty-state-title">Zadaj ticker symbol pre analýzu</div>
+    <div class="empty-state-desc">
+      Skús: AAPL · MSFT · GOOG · NVDA · AMZN · AVGO · MA · V<br>
+      DCF Valuation · Comparable Analysis · Risk Scoring · Final Verdict
+    </div>
+  </div>
+  <div id="analysisContent" style="display:none">
+    <!-- HERO -->
+    <div class="hero-strip" id="heroStrip">
+      <div class="hero-cell main-price">
+        <div class="hero-label" id="heroCompanyShort">—</div>
+        <div class="hero-value" id="heroPrice">—</div>
+        <div class="hero-company" id="heroCompanyFull">—</div>
+      </div>
+      <div class="hero-cell"><div class="hero-label">Change</div><div class="hero-value" id="heroChange">—</div><div class="hero-company" id="heroChangePct">—</div></div>
+      <div class="hero-cell"><div class="hero-label">Market Cap</div><div class="hero-value" id="heroMktCap">—</div><div class="hero-company" id="heroSector">—</div></div>
+      <div class="hero-cell"><div class="hero-label">P/E (TTM)</div><div class="hero-value" id="heroPE">—</div><div class="hero-company" id="heroFwdPE">Fwd: —</div></div>
+      <div class="hero-cell"><div class="hero-label">52W High / Low</div><div class="hero-value" id="hero52WH">—</div><div class="hero-company" id="hero52WL">—</div></div>
+      <div class="hero-cell"><div class="hero-label">Beta · Div Yield</div><div class="hero-value" id="heroBeta">—</div><div class="hero-company" id="heroDivYield">—</div></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('overview')" id="tab-overview"><span>🏢</span> Overview</div>
+      <div class="tab" onclick="switchTab('dcf')" id="tab-dcf"><span>💎</span> DCF Model</div>
+      <div class="tab" onclick="switchTab('multiples')" id="tab-multiples"><span>⚖️</span> Multiples</div>
+      <div class="tab" onclick="switchTab('risk')" id="tab-risk"><span>⚠️</span> Risk</div>
+      <div class="tab" onclick="switchTab('decision')" id="tab-decision"><span>🎯</span> Decision</div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div class="panel active" id="panel-overview">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Company Profile</div></div>
+          <div class="card-body"><div id="profileStats"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Quality Score</div></div>
+          <div class="card-body">
+            <div class="score-container">
+              <div class="score-circle">
+                <canvas class="score-canvas" id="qualityGauge"></canvas>
+                <div class="score-text">
+                  <div class="score-number" id="qualityScoreNum">—</div>
+                  <div class="score-label">/ 100</div>
+                </div>
+              </div>
+              <div style="flex:1" id="qualityBreakdown"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Key Financial Metrics</div></div>
+        <div class="metrics-grid" id="keyMetricsGrid"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Profitability & Margins (5Y History)</div></div>
+        <div class="card-body"><canvas id="marginChart" height="80"></canvas></div>
+      </div>
+    </div>
+
+    <!-- DCF -->
+    <div class="panel" id="panel-dcf">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><div class="card-title-accent"></div>DCF Assumptions</div>
+            <span style="font-size:.7rem;color:var(--text2)" id="dcfAutoNote"></span>
+          </div>
+          <div class="card-body">
+            <div class="slider-group">
+              <div class="slider-header"><span class="slider-label">FCF Growth Y1–5</span><span class="slider-value" id="fcfGrowth1Val">12%</span></div>
+              <input type="range" min="0" max="50" step="0.5" id="fcfGrowth1" value="12" oninput="updateDCF()">
+            </div>
+            <div class="slider-group">
+              <div class="slider-header"><span class="slider-label">FCF Growth Y6–10</span><span class="slider-value" id="fcfGrowth2Val">7%</span></div>
+              <input type="range" min="0" max="30" step="0.5" id="fcfGrowth2" value="7" oninput="updateDCF()">
+            </div>
+            <div class="slider-group">
+              <div class="slider-header"><span class="slider-label">Terminal Growth Rate</span><span class="slider-value" id="tgrVal">2.5%</span></div>
+              <input type="range" min="0.5" max="5" step="0.1" id="tgrSlider" value="2.5" oninput="updateDCF()">
+            </div>
+            <div class="slider-group">
+              <div class="slider-header"><span class="slider-label">Discount Rate (WACC)</span><span class="slider-value" id="waccVal">9%</span></div>
+              <input type="range" min="5" max="20" step="0.25" id="waccSlider" value="9" oninput="updateDCF()">
+            </div>
+            <div class="slider-group">
+              <div class="slider-header"><span class="slider-label">Margin of Safety</span><span class="slider-value" id="mosVal">25%</span></div>
+              <input type="range" min="0" max="50" step="5" id="mosSlider" value="25" oninput="updateDCF()">
+            </div>
+            <div class="sep"></div>
+            <div class="form-group">
+              <label class="form-label">Projection Period</label>
+              <div style="display:flex;gap:8px">
+                <button class="btn-secondary" id="proj5btn" onclick="setProjPeriod(5)" style="flex:1">5 Years</button>
+                <button class="btn-primary" id="proj10btn" onclick="setProjPeriod(10)" style="flex:1">10 Years</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="grid-2" style="gap:1rem;margin-bottom:1rem">
+            <div class="dcf-result-card">
+              <div class="dcf-label">Intrinsic Value</div>
+              <div class="dcf-value" id="dcfIntrinsic" style="color:var(--blue)">—</div>
+            </div>
+            <div class="dcf-result-card">
+              <div class="dcf-label">With Safety Margin</div>
+              <div class="dcf-value" id="dcfSafe" style="color:var(--green)">—</div>
+            </div>
+          </div>
+          <div class="dcf-result-card" style="margin-bottom:1rem">
+            <div class="dcf-label">Upside / Downside vs Current Price</div>
+            <div class="dcf-value" id="dcfUpside">—</div>
+            <div style="margin-top:8px" id="dcfVerdict"></div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Projected FCF</div></div>
+            <div class="card-body"><canvas id="fcfChart" height="150"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Sensitivity Matrix — Intrinsic Value (WACC × Terminal Growth Rate)</div></div>
+        <div class="card-body" style="overflow-x:auto"><div id="sensitivityTable"></div></div>
+      </div>
+    </div>
+
+    <!-- MULTIPLES -->
+    <div class="panel" id="panel-multiples">
+      <div class="grid-3">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>P/E Valuation</div></div>
+          <div class="card-body">
+            <div class="form-group"><label class="form-label">EPS (TTM)</label><div class="number-input-group"><input type="number" id="epsInput" step="0.01" oninput="updateMultiples()"><span>$</span></div></div>
+            <div class="form-group"><label class="form-label">Target P/E Multiple</label><div class="number-input-group"><input type="number" id="targetPE" value="20" step="1" oninput="updateMultiples()"><span>×</span></div></div>
+            <div class="dcf-result-card" style="margin-top:1rem"><div class="dcf-label">Fair Value (P/E)</div><div class="dcf-value" id="peValue" style="color:var(--blue)">—</div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>EV/EBITDA Valuation</div></div>
+          <div class="card-body">
+            <div class="form-group"><label class="form-label">EBITDA ($M)</label><div class="number-input-group"><input type="number" id="ebitdaInput" step="1" oninput="updateMultiples()"><span>$M</span></div></div>
+            <div class="form-group"><label class="form-label">Target EV/EBITDA</label><div class="number-input-group"><input type="number" id="targetEVEBITDA" value="15" step="1" oninput="updateMultiples()"><span>×</span></div></div>
+            <div class="form-group"><label class="form-label">Net Debt ($M)</label><div class="number-input-group"><input type="number" id="netDebtInput" step="1" oninput="updateMultiples()"><span>$M</span></div></div>
+            <div class="dcf-result-card" style="margin-top:1rem"><div class="dcf-label">Fair Value (EV/EBITDA)</div><div class="dcf-value" id="evEbitdaValue" style="color:var(--blue)">—</div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Price/FCF Valuation</div></div>
+          <div class="card-body">
+            <div class="form-group"><label class="form-label">FCF per Share</label><div class="number-input-group"><input type="number" id="fcfPerShareInput" step="0.01" oninput="updateMultiples()"><span>$</span></div></div>
+            <div class="form-group"><label class="form-label">Target P/FCF Multiple</label><div class="number-input-group"><input type="number" id="targetPFCF" value="22" step="1" oninput="updateMultiples()"><span>×</span></div></div>
+            <div class="dcf-result-card" style="margin-top:1rem"><div class="dcf-label">Fair Value (P/FCF)</div><div class="dcf-value" id="pfcfValue" style="color:var(--blue)">—</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Blended Valuation Summary</div></div>
+        <div class="card-body">
+          <div class="grid-2" style="gap:2rem">
+            <div><canvas id="multiplesChart" height="200"></canvas></div>
+            <div><div id="multiplesTable"></div><div class="blended-result" style="margin-top:1.5rem" id="blendedResult"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RISK -->
+    <div class="panel" id="panel-risk">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Altman Z-Score</div></div>
+          <div class="card-body">
+            <div class="z-score-display">
+              <div><div class="z-score-num" id="altmanScore">—</div><div style="font-size:.7rem;color:var(--text2);margin-top:2px">Z-Score</div></div>
+              <div><div id="altmanBadge"></div><div style="font-size:.75rem;color:var(--text2);margin-top:6px;line-height:1.5" id="altmanDesc">—</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Piotroski F-Score</div></div>
+          <div class="card-body">
+            <div style="display:flex;align-items:center;gap:1.5rem;margin-bottom:1rem">
+              <div style="text-align:center;flex-shrink:0"><div class="z-score-num" id="piotroskiScore">—</div><div style="font-size:.7rem;color:var(--text2)">/9</div></div>
+              <div id="piotroskiBadge" style="flex:1"></div>
+            </div>
+            <div id="piotroskiList"></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Quantitative Risk Flags</div></div>
+          <div class="card-body"><div id="riskFlags"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Overall Risk Rating</div></div>
+          <div class="card-body">
+            <div style="text-align:center;margin-bottom:1.5rem">
+              <div id="riskRatingBadge" style="margin-bottom:10px">—</div>
+              <div class="risk-meter" style="max-width:300px;margin:0 auto"><div class="risk-fill" id="riskFill" style="width:0%"></div></div>
+            </div>
+            <div class="sep"></div>
+            <div id="qualitativeChecklist"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECISION -->
+    <div class="panel" id="panel-decision">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Scenario Analysis</div></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Time Horizon</label>
+              <div style="display:flex;gap:6px">
+                <button class="btn-secondary" onclick="setHorizon(3)" id="h3btn">3Y</button>
+                <button class="btn-primary" onclick="setHorizon(5)" id="h5btn">5Y</button>
+                <button class="btn-secondary" onclick="setHorizon(10)" id="h10btn">10Y</button>
+              </div>
+            </div>
+            <div class="form-group"><label class="form-label">Required Rate of Return</label><div class="number-input-group"><input type="number" id="hurdleRate" value="10" step="0.5" oninput="updateScenarios()"><span>%</span></div></div>
+            <div class="sep"></div>
+            <div class="scenario-grid" id="scenarioCards"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Price Target Fan Chart</div></div>
+          <div class="card-body"><canvas id="scenarioChart" height="220"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><div class="card-title-accent"></div>Final Scorecard & Verdict</div></div>
+        <div class="card-body">
+          <div class="grid-2" style="gap:2rem">
+            <div><div id="scoreBarItems"></div></div>
+            <div class="grade-display">
+              <div class="grade-letter" id="gradeDisplay">—</div>
+              <div id="recommendationBadge" style="margin:12px 0 16px"></div>
+              <div style="font-size:.82rem;color:var(--text2);line-height:1.7" id="rationaleText">Spusti analýzu pre vygenerovanie verdiktu.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="export-bar">
+        <button class="export-btn" onclick="copyToClipboard()">📋 Copy Summary</button>
+        <button class="export-btn" onclick="window.print()">🖨️ Print / PDF</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="disclaimer">⚠️ For educational purposes only. Not financial advice. Always do your own research before investing.</div>
+
+<script>
+// ─── DEMO DATA ──────────────────────────────────────────────────────────────
+const DEMO = {
+  AAPL: {
+    profile:[{companyName:'Apple Inc.',sector:'Technology',industry:'Consumer Electronics',country:'US',exchangeShortName:'NASDAQ',ipoDate:'1980-12-12',fullTimeEmployees:'150000',beta:1.24,mktCap:3.1e12}],
+    quote:[{symbol:'AAPL',price:213.5,change:1.82,changesPercentage:0.86,marketCap:3.1e12,pe:32.4,eps:6.59,yearHigh:237.2,yearLow:164.1,sharesOutstanding:15.3e9}],
+    income:[
+      {calendarYear:'2024',revenue:391e9,grossProfit:183e9,netIncome:93.7e9,operatingIncome:117e9,ebitda:130e9,eps:6.11,interestExpense:3.9e9},
+      {calendarYear:'2023',revenue:383e9,grossProfit:170e9,netIncome:96.9e9,operatingIncome:113.5e9,ebitda:125e9,eps:6.13,interestExpense:3.9e9},
+      {calendarYear:'2022',revenue:394e9,grossProfit:170e9,netIncome:99.8e9,operatingIncome:119e9,ebitda:129e9,eps:6.11,interestExpense:2.8e9},
+      {calendarYear:'2021',revenue:365e9,grossProfit:152e9,netIncome:94.7e9,operatingIncome:108e9,ebitda:118e9,eps:5.62,interestExpense:2.6e9},
+      {calendarYear:'2020',revenue:274e9,grossProfit:105e9,netIncome:57.4e9,operatingIncome:66.3e9,ebitda:77e9,eps:3.31,interestExpense:2.9e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:364e9,totalLiabilities:308e9,totalCurrentAssets:153e9,totalCurrentLiabilities:176e9,longTermDebt:85.7e9,shortTermDebt:10.9e9,cashAndCashEquivalents:29.9e9,retainedEarnings:-19.2e9,commonStock:83e9},
+      {calendarYear:'2023',totalAssets:352e9,totalLiabilities:290e9,totalCurrentAssets:143e9,totalCurrentLiabilities:145e9,longTermDebt:95.3e9,shortTermDebt:5.9e9,cashAndCashEquivalents:29.9e9,retainedEarnings:-214e9,commonStock:73.8e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:108e9,operatingCashFlow:118e9},
+      {calendarYear:'2023',freeCashFlow:99.5e9,operatingCashFlow:110e9},
+      {calendarYear:'2022',freeCashFlow:111e9,operatingCashFlow:122e9},
+      {calendarYear:'2021',freeCashFlow:92.9e9,operatingCashFlow:104e9},
+      {calendarYear:'2020',freeCashFlow:73.4e9,operatingCashFlow:80.7e9}
+    ],
+    ratios:[{priceEarningsRatio:32.4,enterpriseValueMultiple:24.1,priceToSalesRatio:7.9,priceToBookRatio:48.2,returnOnEquity:1.47,returnOnAssets:0.26,returnOnCapitalEmployed:0.62,grossProfitMargin:0.468,netProfitMargin:0.239,debtEquityRatio:1.87,currentRatio:0.87,interestCoverage:29.5,freeCashFlowYield:0.035,assetTurnover:1.07,dividendYield:0.005}],
+    keyMetrics:[{freeCashFlowPerShare:7.06}]
+  },
+  MSFT: {
+    profile:[{companyName:'Microsoft Corporation',sector:'Technology',industry:'Software—Infrastructure',country:'US',exchangeShortName:'NASDAQ',ipoDate:'1986-03-13',fullTimeEmployees:'228000',beta:0.91,mktCap:3.35e12}],
+    quote:[{symbol:'MSFT',price:450.2,change:3.15,changesPercentage:0.71,marketCap:3.35e12,pe:34.8,eps:12.93,yearHigh:468.4,yearLow:390.8,sharesOutstanding:7.44e9}],
+    income:[
+      {calendarYear:'2024',revenue:245e9,grossProfit:180e9,netIncome:88.1e9,operatingIncome:109e9,ebitda:125e9,eps:11.8,interestExpense:1.6e9},
+      {calendarYear:'2023',revenue:211e9,grossProfit:146e9,netIncome:72.4e9,operatingIncome:88.5e9,ebitda:104e9,eps:9.72,interestExpense:1.9e9},
+      {calendarYear:'2022',revenue:198e9,grossProfit:135e9,netIncome:72.7e9,operatingIncome:83.4e9,ebitda:98.8e9,eps:9.65,interestExpense:2.1e9},
+      {calendarYear:'2021',revenue:168e9,grossProfit:115e9,netIncome:61.3e9,operatingIncome:69.9e9,ebitda:84.7e9,eps:8.05,interestExpense:2.3e9},
+      {calendarYear:'2020',revenue:143e9,grossProfit:97.e9,netIncome:44.3e9,operatingIncome:52.9e9,ebitda:67.3e9,eps:5.76,interestExpense:2.6e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:512e9,totalLiabilities:243e9,totalCurrentAssets:191e9,totalCurrentLiabilities:125e9,longTermDebt:42.7e9,shortTermDebt:3.2e9,cashAndCashEquivalents:18.3e9,retainedEarnings:257e9,commonStock:95.5e9},
+      {calendarYear:'2023',totalAssets:411e9,totalLiabilities:205e9,totalCurrentAssets:184e9,totalCurrentLiabilities:104e9,longTermDebt:41.9e9,shortTermDebt:5.2e9,cashAndCashEquivalents:34.7e9,retainedEarnings:190e9,commonStock:85.8e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:74.1e9,operatingCashFlow:118e9},
+      {calendarYear:'2023',freeCashFlow:59.5e9,operatingCashFlow:87.9e9},
+      {calendarYear:'2022',freeCashFlow:65.1e9,operatingCashFlow:89.0e9},
+      {calendarYear:'2021',freeCashFlow:56.1e9,operatingCashFlow:76.7e9},
+      {calendarYear:'2020',freeCashFlow:45.2e9,operatingCashFlow:60.7e9}
+    ],
+    ratios:[{priceEarningsRatio:34.8,enterpriseValueMultiple:27.3,priceToSalesRatio:13.7,priceToBookRatio:12.4,returnOnEquity:0.38,returnOnAssets:0.17,returnOnCapitalEmployed:0.29,grossProfitMargin:0.735,netProfitMargin:0.360,debtEquityRatio:0.32,currentRatio:1.52,interestCoverage:68.1,freeCashFlowYield:0.022,assetTurnover:0.48,dividendYield:0.007}],
+    keyMetrics:[{freeCashFlowPerShare:9.96}]
+  },
+  NVDA: {
+    profile:[{companyName:'NVIDIA Corporation',sector:'Technology',industry:'Semiconductors',country:'US',exchangeShortName:'NASDAQ',ipoDate:'1999-01-22',fullTimeEmployees:'29600',beta:1.72,mktCap:2.85e12}],
+    quote:[{symbol:'NVDA',price:116.2,change:2.45,changesPercentage:2.15,marketCap:2.85e12,pe:38.5,eps:2.99,yearHigh:149.4,yearLow:86.2,sharesOutstanding:24.5e9}],
+    income:[
+      {calendarYear:'2025',revenue:130e9,grossProfit:97.9e9,netIncome:72.9e9,operatingIncome:81.5e9,ebitda:86e9,eps:2.99,interestExpense:0.25e9},
+      {calendarYear:'2024',revenue:60.9e9,grossProfit:44.2e9,netIncome:29.8e9,operatingIncome:32.9e9,ebitda:35.4e9,eps:1.19,interestExpense:0.26e9},
+      {calendarYear:'2023',revenue:26.9e9,grossProfit:15.3e9,netIncome:4.37e9,operatingIncome:4.22e9,ebitda:5.6e9,eps:0.16,interestExpense:0.26e9},
+      {calendarYear:'2022',revenue:26.9e9,grossProfit:17.5e9,netIncome:9.75e9,operatingIncome:10.0e9,ebitda:11e9,eps:0.37,interestExpense:0.24e9},
+      {calendarYear:'2021',revenue:16.7e9,grossProfit:10.4e9,netIncome:4.33e9,operatingIncome:4.53e9,ebitda:5.2e9,eps:0.16,interestExpense:0.24e9}
+    ],
+    balance:[
+      {calendarYear:'2025',totalAssets:111e9,totalLiabilities:34.5e9,totalCurrentAssets:73e9,totalCurrentLiabilities:22e9,longTermDebt:8.46e9,shortTermDebt:1.25e9,cashAndCashEquivalents:8.6e9,retainedEarnings:51e9,commonStock:0.0245e9},
+      {calendarYear:'2024',totalAssets:65.7e9,totalLiabilities:22.6e9,totalCurrentAssets:44.3e9,totalCurrentLiabilities:9.5e9,longTermDebt:8.46e9,shortTermDebt:1.25e9,cashAndCashEquivalents:7.3e9,retainedEarnings:29e9,commonStock:0.0245e9}
+    ],
+    cashflow:[
+      {calendarYear:'2025',freeCashFlow:60.8e9,operatingCashFlow:64.1e9},
+      {calendarYear:'2024',freeCashFlow:27.0e9,operatingCashFlow:28.7e9},
+      {calendarYear:'2023',freeCashFlow:3.8e9,operatingCashFlow:5.6e9},
+      {calendarYear:'2022',freeCashFlow:8.13e9,operatingCashFlow:9.1e9},
+      {calendarYear:'2021',freeCashFlow:4.69e9,operatingCashFlow:5.82e9}
+    ],
+    ratios:[{priceEarningsRatio:38.5,enterpriseValueMultiple:31.2,priceToSalesRatio:21.9,priceToBookRatio:38.7,returnOnEquity:1.23,returnOnAssets:0.66,returnOnCapitalEmployed:0.89,grossProfitMargin:0.753,netProfitMargin:0.561,debtEquityRatio:0.18,currentRatio:3.32,interestCoverage:326,freeCashFlowYield:0.021,assetTurnover:1.17,dividendYield:0.0003}],
+    keyMetrics:[{freeCashFlowPerShare:2.48}]
+  },
+  GOOG: {
+    profile:[{companyName:'Alphabet Inc.',sector:'Communication Services',industry:'Internet Content & Information',country:'US',exchangeShortName:'NASDAQ',ipoDate:'2004-08-19',fullTimeEmployees:'181269',beta:1.06,mktCap:2.1e12}],
+    quote:[{symbol:'GOOG',price:175.5,change:1.22,changesPercentage:0.70,marketCap:2.1e12,pe:21.4,eps:8.02,yearHigh:208.7,yearLow:140.5,sharesOutstanding:12.0e9}],
+    income:[
+      {calendarYear:'2024',revenue:350e9,grossProfit:221e9,netIncome:94.0e9,operatingIncome:112e9,ebitda:128e9,eps:7.79,interestExpense:0.15e9},
+      {calendarYear:'2023',revenue:307e9,grossProfit:186e9,netIncome:73.8e9,operatingIncome:84.3e9,ebitda:100e9,eps:5.80,interestExpense:0.16e9},
+      {calendarYear:'2022',revenue:282e9,grossProfit:156e9,netIncome:59.9e9,operatingIncome:74.8e9,ebitda:90e9,eps:4.56,interestExpense:0.18e9},
+      {calendarYear:'2021',revenue:257e9,grossProfit:146e9,netIncome:76.0e9,operatingIncome:78.7e9,ebitda:92e9,eps:5.61,interestExpense:0.35e9},
+      {calendarYear:'2020',revenue:182e9,grossProfit:97.8e9,netIncome:40.3e9,operatingIncome:41.2e9,ebitda:55.5e9,eps:2.93,interestExpense:0.14e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:450e9,totalLiabilities:124e9,totalCurrentAssets:192e9,totalCurrentLiabilities:83e9,longTermDebt:12.0e9,shortTermDebt:0.9e9,cashAndCashEquivalents:30.7e9,retainedEarnings:306e9,commonStock:90e9},
+      {calendarYear:'2023',totalAssets:402e9,totalLiabilities:117e9,totalCurrentAssets:164e9,totalCurrentLiabilities:81.8e9,longTermDebt:13.3e9,shortTermDebt:0.9e9,cashAndCashEquivalents:24.0e9,retainedEarnings:267e9,commonStock:79.5e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:72.8e9,operatingCashFlow:125e9},
+      {calendarYear:'2023',freeCashFlow:69.5e9,operatingCashFlow:101e9},
+      {calendarYear:'2022',freeCashFlow:60.0e9,operatingCashFlow:91.5e9},
+      {calendarYear:'2021',freeCashFlow:67.0e9,operatingCashFlow:91.7e9},
+      {calendarYear:'2020',freeCashFlow:42.8e9,operatingCashFlow:65.1e9}
+    ],
+    ratios:[{priceEarningsRatio:21.4,enterpriseValueMultiple:16.8,priceToSalesRatio:6.0,priceToBookRatio:6.2,returnOnEquity:0.31,returnOnAssets:0.21,returnOnCapitalEmployed:0.26,grossProfitMargin:0.632,netProfitMargin:0.268,debtEquityRatio:0.085,currentRatio:2.32,interestCoverage:746,freeCashFlowYield:0.035,assetTurnover:0.78,dividendYield:0.005}],
+    keyMetrics:[{freeCashFlowPerShare:6.07}]
+  },
+  AMZN: {
+    profile:[{companyName:'Amazon.com Inc.',sector:'Consumer Cyclical',industry:'Internet Retail',country:'US',exchangeShortName:'NASDAQ',ipoDate:'1997-05-15',fullTimeEmployees:'1525000',beta:1.18,mktCap:2.3e12}],
+    quote:[{symbol:'AMZN',price:215.0,change:2.10,changesPercentage:0.99,marketCap:2.3e12,pe:37.2,eps:5.53,yearHigh:242.5,yearLow:166.5,sharesOutstanding:10.7e9}],
+    income:[
+      {calendarYear:'2024',revenue:638e9,grossProfit:292e9,netIncome:59.2e9,operatingIncome:68.6e9,ebitda:118e9,eps:5.53,interestExpense:3.5e9},
+      {calendarYear:'2023',revenue:574e9,grossProfit:270e9,netIncome:30.4e9,operatingIncome:36.9e9,ebitda:80.6e9,eps:2.90,interestExpense:3.2e9},
+      {calendarYear:'2022',revenue:514e9,grossProfit:225e9,netIncome:-2.7e9,operatingIncome:12.2e9,ebitda:40.1e9,eps:-0.27,interestExpense:2.7e9},
+      {calendarYear:'2021',revenue:470e9,grossProfit:197e9,netIncome:33.4e9,operatingIncome:24.9e9,ebitda:55.8e9,eps:3.24,interestExpense:1.8e9},
+      {calendarYear:'2020',revenue:386e9,grossProfit:153e9,netIncome:21.3e9,operatingIncome:22.9e9,ebitda:48.2e9,eps:2.09,interestExpense:1.7e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:624e9,totalLiabilities:381e9,totalCurrentAssets:185e9,totalCurrentLiabilities:179e9,longTermDebt:58.3e9,shortTermDebt:11.7e9,cashAndCashEquivalents:86.8e9,retainedEarnings:155e9,commonStock:0.01e9},
+      {calendarYear:'2023',totalAssets:527e9,totalLiabilities:325e9,totalCurrentAssets:149e9,totalCurrentLiabilities:164e9,longTermDebt:58.3e9,shortTermDebt:14.7e9,cashAndCashEquivalents:73.4e9,retainedEarnings:101e9,commonStock:0.01e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:38.2e9,operatingCashFlow:115e9},
+      {calendarYear:'2023',freeCashFlow:35.5e9,operatingCashFlow:84.9e9},
+      {calendarYear:'2022',freeCashFlow:-19.5e9,operatingCashFlow:46.8e9},
+      {calendarYear:'2021',freeCashFlow:-9.1e9,operatingCashFlow:46.3e9},
+      {calendarYear:'2020',freeCashFlow:26.4e9,operatingCashFlow:66.1e9}
+    ],
+    ratios:[{priceEarningsRatio:37.2,enterpriseValueMultiple:22.1,priceToSalesRatio:3.6,priceToBookRatio:8.4,returnOnEquity:0.22,returnOnAssets:0.095,returnOnCapitalEmployed:0.13,grossProfitMargin:0.457,netProfitMargin:0.093,debtEquityRatio:0.47,currentRatio:1.03,interestCoverage:19.6,freeCashFlowYield:0.017,assetTurnover:1.02,dividendYield:0}],
+    keyMetrics:[{freeCashFlowPerShare:3.57}]
+  },
+  AVGO: {
+    profile:[{companyName:'Broadcom Inc.',sector:'Technology',industry:'Semiconductors',country:'US',exchangeShortName:'NASDAQ',ipoDate:'2009-08-06',fullTimeEmployees:'69000',beta:1.14,mktCap:0.98e12}],
+    quote:[{symbol:'AVGO',price:225.8,change:1.85,changesPercentage:0.83,marketCap:0.98e12,pe:58.2,eps:2.06,yearHigh:251.9,yearLow:137.6,sharesOutstanding:4.34e9}],
+    income:[
+      {calendarYear:'2024',revenue:51.6e9,grossProfit:37.0e9,netIncome:5.9e9,operatingIncome:13.1e9,ebitda:29.0e9,eps:1.17,interestExpense:4.5e9},
+      {calendarYear:'2023',revenue:35.8e9,grossProfit:22.5e9,netIncome:14.1e9,operatingIncome:16.0e9,ebitda:24.0e9,eps:3.27,interestExpense:1.9e9},
+      {calendarYear:'2022',revenue:33.2e9,grossProfit:21.4e9,netIncome:11.5e9,operatingIncome:14.0e9,ebitda:22.0e9,eps:2.74,interestExpense:1.8e9},
+      {calendarYear:'2021',revenue:27.5e9,grossProfit:17.6e9,netIncome:6.74e9,operatingIncome:10.9e9,ebitda:18.0e9,eps:1.55,interestExpense:1.9e9},
+      {calendarYear:'2020',revenue:23.9e9,grossProfit:15.0e9,netIncome:2.96e9,operatingIncome:8.0e9,ebitda:13.8e9,eps:0.7,interestExpense:1.9e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:166e9,totalLiabilities:123e9,totalCurrentAssets:22.0e9,totalCurrentLiabilities:14.6e9,longTermDebt:65.9e9,shortTermDebt:1.8e9,cashAndCashEquivalents:9.3e9,retainedEarnings:-13e9,commonStock:0.004e9},
+      {calendarYear:'2023',totalAssets:72.9e9,totalLiabilities:52.7e9,totalCurrentAssets:10.1e9,totalCurrentLiabilities:9.8e9,longTermDebt:35.8e9,shortTermDebt:1.7e9,cashAndCashEquivalents:12.2e9,retainedEarnings:-6.5e9,commonStock:0.004e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:19.7e9,operatingCashFlow:21.0e9},
+      {calendarYear:'2023',freeCashFlow:17.6e9,operatingCashFlow:18.1e9},
+      {calendarYear:'2022',freeCashFlow:16.3e9,operatingCashFlow:16.9e9},
+      {calendarYear:'2021',freeCashFlow:13.8e9,operatingCashFlow:14.3e9},
+      {calendarYear:'2020',freeCashFlow:12.2e9,operatingCashFlow:12.6e9}
+    ],
+    ratios:[{priceEarningsRatio:58.2,enterpriseValueMultiple:24.0,priceToSalesRatio:19.0,priceToBookRatio:15.0,returnOnEquity:0.28,returnOnAssets:0.036,returnOnCapitalEmployed:0.079,grossProfitMargin:0.717,netProfitMargin:0.114,debtEquityRatio:3.25,currentRatio:1.51,interestCoverage:2.91,freeCashFlowYield:0.020,assetTurnover:0.31,dividendYield:0.014}],
+    keyMetrics:[{freeCashFlowPerShare:4.54}]
+  },
+  MA: {
+    profile:[{companyName:'Mastercard Incorporated',sector:'Financial Services',industry:'Credit Services',country:'US',exchangeShortName:'NYSE',ipoDate:'2006-05-25',fullTimeEmployees:'33000',beta:1.13,mktCap:0.49e12}],
+    quote:[{symbol:'MA',price:537.2,change:4.12,changesPercentage:0.77,marketCap:0.49e12,pe:38.0,eps:13.89,yearHigh:574.2,yearLow:430.9,sharesOutstanding:0.913e9}],
+    income:[
+      {calendarYear:'2024',revenue:28.2e9,grossProfit:22.2e9,netIncome:12.9e9,operatingIncome:14.8e9,ebitda:16.2e9,eps:14.02,interestExpense:0.6e9},
+      {calendarYear:'2023',revenue:25.1e9,grossProfit:19.8e9,netIncome:11.2e9,operatingIncome:12.7e9,ebitda:14.0e9,eps:11.96,interestExpense:0.6e9},
+      {calendarYear:'2022',revenue:22.2e9,grossProfit:17.3e9,netIncome:9.93e9,operatingIncome:11.4e9,ebitda:12.5e9,eps:10.22,interestExpense:0.6e9},
+      {calendarYear:'2021',revenue:18.9e9,grossProfit:14.6e9,netIncome:8.69e9,operatingIncome:9.7e9,ebitda:10.7e9,eps:8.65,interestExpense:0.6e9},
+      {calendarYear:'2020',revenue:15.3e9,grossProfit:11.5e9,netIncome:6.41e9,operatingIncome:7.0e9,ebitda:7.9e9,eps:6.37,interestExpense:0.7e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:45.8e9,totalLiabilities:36.8e9,totalCurrentAssets:14.2e9,totalCurrentLiabilities:15.5e9,longTermDebt:14.9e9,shortTermDebt:0.75e9,cashAndCashEquivalents:7.2e9,retainedEarnings:3.0e9,commonStock:0.0009e9},
+      {calendarYear:'2023',totalAssets:42.3e9,totalLiabilities:34.2e9,totalCurrentAssets:12.0e9,totalCurrentLiabilities:13.2e9,longTermDebt:13.5e9,shortTermDebt:1.0e9,cashAndCashEquivalents:6.2e9,retainedEarnings:1.8e9,commonStock:0.0009e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:11.6e9,operatingCashFlow:12.9e9},
+      {calendarYear:'2023',freeCashFlow:10.1e9,operatingCashFlow:11.2e9},
+      {calendarYear:'2022',freeCashFlow:9.16e9,operatingCashFlow:10.0e9},
+      {calendarYear:'2021',freeCashFlow:7.82e9,operatingCashFlow:8.7e9},
+      {calendarYear:'2020',freeCashFlow:5.92e9,operatingCashFlow:6.8e9}
+    ],
+    ratios:[{priceEarningsRatio:38.0,enterpriseValueMultiple:28.5,priceToSalesRatio:17.4,priceToBookRatio:54.2,returnOnEquity:1.56,returnOnAssets:0.28,returnOnCapitalEmployed:0.34,grossProfitMargin:0.787,netProfitMargin:0.457,debtEquityRatio:1.67,currentRatio:0.92,interestCoverage:24.7,freeCashFlowYield:0.024,assetTurnover:0.62,dividendYield:0.005}],
+    keyMetrics:[{freeCashFlowPerShare:12.71}]
+  },
+  V: {
+    profile:[{companyName:'Visa Inc.',sector:'Financial Services',industry:'Credit Services',country:'US',exchangeShortName:'NYSE',ipoDate:'2008-03-19',fullTimeEmployees:'30500',beta:0.95,mktCap:0.62e12}],
+    quote:[{symbol:'V',price:373.1,change:2.88,changesPercentage:0.78,marketCap:0.62e12,pe:31.2,eps:10.46,yearHigh:398.4,yearLow:295.3,sharesOutstanding:1.98e9}],
+    income:[
+      {calendarYear:'2024',revenue:35.9e9,grossProfit:26.8e9,netIncome:19.7e9,operatingIncome:23.0e9,ebitda:25.0e9,eps:10.59,interestExpense:0.75e9},
+      {calendarYear:'2023',revenue:32.7e9,grossProfit:24.4e9,netIncome:17.3e9,operatingIncome:20.4e9,ebitda:22.2e9,eps:9.10,interestExpense:0.75e9},
+      {calendarYear:'2022',revenue:29.3e9,grossProfit:21.9e9,netIncome:15.0e9,operatingIncome:17.9e9,ebitda:19.5e9,eps:7.55,interestExpense:0.55e9},
+      {calendarYear:'2021',revenue:24.1e9,grossProfit:17.9e9,netIncome:12.3e9,operatingIncome:14.6e9,ebitda:16.1e9,eps:5.78,interestExpense:0.5e9},
+      {calendarYear:'2020',revenue:21.8e9,grossProfit:16.0e9,netIncome:10.9e9,operatingIncome:13.0e9,ebitda:14.3e9,eps:5.04,interestExpense:0.5e9}
+    ],
+    balance:[
+      {calendarYear:'2024',totalAssets:91.8e9,totalLiabilities:47.9e9,totalCurrentAssets:26.1e9,totalCurrentLiabilities:20.1e9,longTermDebt:20.1e9,shortTermDebt:3.0e9,cashAndCashEquivalents:9.1e9,retainedEarnings:23.9e9,commonStock:0.002e9},
+      {calendarYear:'2023',totalAssets:87.7e9,totalLiabilities:45.9e9,totalCurrentAssets:23.3e9,totalCurrentLiabilities:17.0e9,longTermDebt:20.4e9,shortTermDebt:3.0e9,cashAndCashEquivalents:16.3e9,retainedEarnings:20.3e9,commonStock:0.002e9}
+    ],
+    cashflow:[
+      {calendarYear:'2024',freeCashFlow:18.7e9,operatingCashFlow:20.5e9},
+      {calendarYear:'2023',freeCashFlow:16.3e9,operatingCashFlow:17.9e9},
+      {calendarYear:'2022',freeCashFlow:14.6e9,operatingCashFlow:16.1e9},
+      {calendarYear:'2021',freeCashFlow:12.1e9,operatingCashFlow:13.6e9},
+      {calendarYear:'2020',freeCashFlow:10.6e9,operatingCashFlow:12.0e9}
+    ],
+    ratios:[{priceEarningsRatio:31.2,enterpriseValueMultiple:24.0,priceToSalesRatio:17.3,priceToBookRatio:14.8,returnOnEquity:0.51,returnOnAssets:0.22,returnOnCapitalEmployed:0.27,grossProfitMargin:0.747,netProfitMargin:0.549,debtEquityRatio:0.52,currentRatio:1.30,interestCoverage:30.7,freeCashFlowYield:0.030,assetTurnover:0.39,dividendYield:0.007}],
+    keyMetrics:[{freeCashFlowPerShare:9.44}]
+  }
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let API_KEY = localStorage.getItem('fmp_api_key') || '';
+let USE_LIVE = false;
+let currentData = {};
+let projPeriod = 10;
+let horizon = 5;
+let marginChartInst, fcfChartInst, multiplesChartInst, scenarioChartInst, gaugeChartInst;
+const BASE = 'https://financialmodelingprep.com/api/v3';
+
+const fmt = (v,d=2)=>{if(v===null||v===undefined||isNaN(v))return'—';return Number(v).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d})};
+const fmtBig = v=>{if(v===null||v===undefined||isNaN(v))return'—';const abs=Math.abs(v),sign=v<0?'-':'';if(abs>=1e12)return sign+'$'+(abs/1e12).toFixed(2)+'T';if(abs>=1e9)return sign+'$'+(abs/1e9).toFixed(2)+'B';if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(2)+'M';return sign+'$'+fmt(abs)};
+const fmtPct = v=>(v===null||v===undefined||isNaN(v))?'—':(v*100).toFixed(1)+'%';
+const fmtD = v=>(v===null||v===undefined||isNaN(v))?'—':'$'+fmt(v);
+
+// ─── API MODAL ────────────────────────────────────────────────────────────────
+function openApiModal(){document.getElementById('apiModal').classList.add('open');document.getElementById('apiKeyInput').value=API_KEY}
+function closeApiModal(){document.getElementById('apiModal').classList.remove('open')}
+function saveApiKey(){
+  API_KEY=document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('fmp_api_key',API_KEY);
+  updateApiStatus();
+  closeApiModal();
+}
+function updateApiStatus(){
+  const dot=document.getElementById('apiDot'),lbl=document.getElementById('apiStatus');
+  if(API_KEY){dot.classList.add('connected');lbl.textContent='Connected';document.getElementById('liveModeBtn').style.display='flex';setMode('live')}
+  else{dot.classList.remove('connected');lbl.textContent='Add API Key';document.getElementById('liveModeBtn').style.display='none';setMode('demo')}
+}
+
+function setMode(mode){
+  USE_LIVE = mode==='live' && !!API_KEY;
+  document.getElementById('demoModeBtn').className='mode-btn'+(USE_LIVE?'':' active');
+  document.getElementById('liveModeBtn').className='mode-btn live'+(USE_LIVE?' active':'');
+  document.getElementById('modeInfoBar').innerHTML = USE_LIVE
+    ? '🔴 <strong>Live API mode</strong> — Reálne dáta z Financial Modeling Prep. Zadaj akýkoľvek ticker.'
+    : '📊 <strong>Demo režim</strong> — Reálne dáta pre: AAPL · MSFT · GOOG · NVDA · AMZN · AVGO · MA · V. Pre live API: vlož API key.';
+}
+
+// ─── RECENT ───────────────────────────────────────────────────────────────────
+function addRecent(t){let r=JSON.parse(localStorage.getItem('recent_tickers')||'[]');r=[t,...r.filter(x=>x!==t)].slice(0,6);localStorage.setItem('recent_tickers',JSON.stringify(r));renderRecent()}
+function renderRecent(){const r=JSON.parse(localStorage.getItem('recent_tickers')||'[]');document.getElementById('recentTickers').innerHTML=r.map(t=>`<div class="ticker-chip" onclick="loadTicker('${t}')">${t}</div>`).join('')}
+function loadTicker(t){document.getElementById('tickerInput').value=t;analyzeStock()}
+
+function showError(msg){const el=document.getElementById('errorBar');el.classList.remove('hidden');el.style.display='flex';document.getElementById('errorMsg').textContent=msg}
+function hideError(){const el=document.getElementById('errorBar');el.classList.add('hidden');el.style.display='none'}
+
+function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.getElementById('tab-'+n).classList.add('active');document.getElementById('panel-'+n).classList.add('active')}
+
+// ─── MAIN ANALYZE ─────────────────────────────────────────────────────────────
+async function analyzeStock(){
+  const ticker=document.getElementById('tickerInput').value.trim().toUpperCase();
+  if(!ticker)return;
+  hideError();
+  document.getElementById('searchBtn').disabled=true;
+  document.getElementById('searchBtn').textContent='Načítavam...';
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('analysisContent').style.display='block';
+
+  try{
+    let data;
+    if(USE_LIVE && API_KEY){
+      data=await fetchLive(ticker);
+    } else {
+      data=DEMO[ticker];
+      if(!data){
+        showError(`Demo dáta pre "${ticker}" nie sú dostupné. Skús: AAPL, MSFT, GOOG, NVDA, AMZN, AVGO, MA, V — alebo vlož API key pre live dáta.`);
+        document.getElementById('analysisContent').style.display='none';
+        document.getElementById('emptyState').style.display='block';
+        return;
+      }
+    }
+    currentData={ticker,...data};
+    renderHero();renderOverview();initDCF();initMultiples();renderRisk();renderDecision();
+    addRecent(ticker);
+  } catch(e){
+    showError('API chyba: '+e.message+'. Skontroluj API key alebo prepni na Demo režim.');
+    document.getElementById('analysisContent').style.display='none';
+    document.getElementById('emptyState').style.display='block';
+  } finally{
+    document.getElementById('searchBtn').disabled=false;
+    document.getElementById('searchBtn').textContent='Analyze';
+  }
+}
+
+async function fetchLive(ticker){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),12000);
+  const fetch2=(path)=>fetch(`${BASE}${path}${path.includes('?')?'&':'?'}apikey=${API_KEY}`,{signal:controller.signal}).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()});
+  try{
+    const [profile,quote,income,balance,cashflow,ratios,keyMetrics]=await Promise.all([
+      fetch2(`/profile/${ticker}`),fetch2(`/quote/${ticker}`),
+      fetch2(`/income-statement/${ticker}?limit=5`),fetch2(`/balance-sheet-statement/${ticker}?limit=5`),
+      fetch2(`/cash-flow-statement/${ticker}?limit=5`),fetch2(`/ratios/${ticker}?limit=5`),
+      fetch2(`/key-metrics/${ticker}?limit=5`)
+    ]);
+    clearTimeout(timeout);
+    return{profile,quote,income,balance,cashflow,ratios,keyMetrics};
+  }catch(e){clearTimeout(timeout);if(e.name==='AbortError')throw new Error('Timeout — API neodpovedá. Skontroluj sieťové pripojenie.');throw e}
+}
+
+// ─── HERO ─────────────────────────────────────────────────────────────────────
+function renderHero(){
+  const p=currentData.profile[0],q=currentData.quote[0];
+  if(!p||!q)return;
+  document.getElementById('heroCompanyShort').textContent=currentData.ticker;
+  document.getElementById('heroPrice').textContent=q.price?'$'+fmt(q.price):'—';
+  document.getElementById('heroCompanyFull').textContent=p.companyName||'—';
+  const chg=q.change,chgPct=q.changesPercentage;
+  const ce=document.getElementById('heroChange'),cpe=document.getElementById('heroChangePct');
+  ce.textContent=chg?(chg>0?'+$':'-$')+fmt(Math.abs(chg)):'—';
+  cpe.textContent=chgPct?(chgPct>0?'+':'')+fmt(chgPct,2)+'%':'—';
+  ce.className='hero-value '+(chg>=0?'change-positive':'change-negative');
+  cpe.className='hero-company '+(chg>=0?'change-positive':'change-negative');
+  document.getElementById('heroMktCap').textContent=fmtBig(q.marketCap);
+  document.getElementById('heroSector').textContent=p.sector||'—';
+  document.getElementById('heroPE').textContent=q.pe?fmt(q.pe,1)+'×':'—';
+  document.getElementById('heroFwdPE').textContent='Fwd: '+(currentData.ratios[0]?.priceEarningsRatio?fmt(currentData.ratios[0].priceEarningsRatio,1)+'×':'—');
+  document.getElementById('hero52WH').textContent=q.yearHigh?'$'+fmt(q.yearHigh):'—';
+  document.getElementById('hero52WL').textContent=q.yearLow?'Lo $'+fmt(q.yearLow):'—';
+  document.getElementById('heroBeta').textContent=p.beta?fmt(p.beta,2):'—';
+  document.getElementById('heroDivYield').textContent='Div: '+(currentData.ratios[0]?.dividendYield?fmtPct(currentData.ratios[0].dividendYield):'N/A');
+}
+
+// ─── OVERVIEW ─────────────────────────────────────────────────────────────────
+function renderOverview(){
+  const p=currentData.profile[0],r=currentData.ratios[0]||{},q=currentData.quote[0];
+  document.getElementById('profileStats').innerHTML=[['Sector',p?.sector],['Industry',p?.industry],['Exchange',p?.exchangeShortName],['Country',p?.country],['IPO Date',p?.ipoDate],['Employees',p?.fullTimeEmployees?Number(p.fullTimeEmployees).toLocaleString():'—']].map(([k,v])=>`<div class="stat-row"><span class="stat-key">${k}</span><span class="stat-val">${v||'—'}</span></div>`).join('');
+  document.getElementById('keyMetricsGrid').innerHTML=[
+    ['P/E (TTM)',q?.pe?fmt(q.pe,1)+'×':'—'],['EV/EBITDA',r.enterpriseValueMultiple?fmt(r.enterpriseValueMultiple,1)+'×':'—'],['P/S',r.priceToSalesRatio?fmt(r.priceToSalesRatio,1)+'×':'—'],
+    ['P/B',r.priceToBookRatio?fmt(r.priceToBookRatio,1)+'×':'—'],['ROE',r.returnOnEquity?fmtPct(r.returnOnEquity):'—'],['ROA',r.returnOnAssets?fmtPct(r.returnOnAssets):'—'],
+    ['ROCE',r.returnOnCapitalEmployed?fmtPct(r.returnOnCapitalEmployed):'—'],['Gross Margin',r.grossProfitMargin?fmtPct(r.grossProfitMargin):'—'],['Net Margin',r.netProfitMargin?fmtPct(r.netProfitMargin):'—'],
+    ['Debt/Equity',r.debtEquityRatio?fmt(r.debtEquityRatio,2):'—'],['Current Ratio',r.currentRatio?fmt(r.currentRatio,2):'—'],['FCF Yield',r.freeCashFlowYield?fmtPct(r.freeCashFlowYield):'—']
+  ].map(([l,v])=>`<div class="metric-cell"><div class="metric-label">${l}</div><div class="metric-value">${v}</div></div>`).join('');
+  const score=calcQualityScore(r,p);
+  document.getElementById('qualityScoreNum').textContent=score.total;
+  document.getElementById('qualityScoreNum').style.color=score.total>=70?'var(--green)':score.total>=45?'var(--amber)':'var(--red)';
+  drawGauge(score.total);
+  document.getElementById('qualityBreakdown').innerHTML=[['Profitability',score.profitability,35],['Balance Sheet',score.balance,35],['Efficiency',score.efficiency,30]].map(([l,v,max])=>`<div class="score-bar-item"><div class="score-bar-header"><span style="color:var(--text2);font-size:.78rem">${l}</span><span style="font-family:var(--mono);font-size:.78rem">${v}/${max}</span></div><div class="score-bar-track"><div class="score-bar-fill" style="width:${(v/max)*100}%"></div></div></div>`).join('');
+  renderMarginChart();
+}
+
+function calcQualityScore(r,p){
+  let profitability=0,balance=0,efficiency=0;
+  if(r.grossProfitMargin>0.5)profitability+=12;else if(r.grossProfitMargin>0.3)profitability+=8;else if(r.grossProfitMargin>0.1)profitability+=4;
+  if(r.netProfitMargin>0.2)profitability+=12;else if(r.netProfitMargin>0.1)profitability+=8;else if(r.netProfitMargin>0)profitability+=4;
+  if(r.freeCashFlowYield>0)profitability+=11;
+  if(r.debtEquityRatio<0.5)balance+=12;else if(r.debtEquityRatio<1.5)balance+=8;else if(r.debtEquityRatio<3)balance+=4;
+  if(r.currentRatio>2)balance+=12;else if(r.currentRatio>1)balance+=8;else if(r.currentRatio>0.7)balance+=4;
+  if(r.interestCoverage>10)balance+=11;else if(r.interestCoverage>5)balance+=7;else if(r.interestCoverage>2)balance+=3;
+  if(r.returnOnEquity>0.2)efficiency+=10;else if(r.returnOnEquity>0.1)efficiency+=6;
+  if(r.returnOnAssets>0.1)efficiency+=10;else if(r.returnOnAssets>0.05)efficiency+=6;
+  if(r.assetTurnover>1)efficiency+=10;else if(r.assetTurnover>0.5)efficiency+=6;
+  return{profitability:Math.min(35,profitability),balance:Math.min(35,balance),efficiency:Math.min(30,efficiency),total:Math.min(100,profitability+balance+efficiency)};
+}
+
+function drawGauge(score){
+  if(gaugeChartInst)gaugeChartInst.destroy();
+  const color=score>=70?'#00d084':score>=45?'#ffb347':'#ff4d6d';
+  gaugeChartInst=new Chart(document.getElementById('qualityGauge'),{type:'doughnut',data:{datasets:[{data:[score,100-score],backgroundColor:[color,'#1a1a35'],borderWidth:0,borderRadius:4}]},options:{cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false}},animation:{animateRotate:true,duration:600}}});
+}
+
+function renderMarginChart(){
+  if(marginChartInst)marginChartInst.destroy();
+  const inc=currentData.income,cf=currentData.cashflow;
+  const years=inc.slice(0,5).map(y=>y.calendarYear||y.date?.substring(0,4)).reverse();
+  const gm=inc.slice(0,5).map(y=>y.grossProfit&&y.revenue?y.grossProfit/y.revenue*100:0).reverse();
+  const nm=inc.slice(0,5).map(y=>y.netIncome&&y.revenue?y.netIncome/y.revenue*100:0).reverse();
+  const fcfm=cf.slice(0,5).map((y,i)=>{const r=inc[i]?.revenue;return y.freeCashFlow&&r?y.freeCashFlow/r*100:0}).reverse();
+  marginChartInst=new Chart(document.getElementById('marginChart'),{type:'line',data:{labels:years,datasets:[{label:'Gross Margin',data:gm,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.08)',tension:.3,fill:true},{label:'Net Margin',data:nm,borderColor:'#00d084',backgroundColor:'rgba(0,208,132,.08)',tension:.3,fill:true},{label:'FCF Margin',data:fcfm,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,.08)',tension:.3,fill:true}]},options:{responsive:true,plugins:{legend:{labels:{color:'#9090b8',font:{size:11}}}},scales:{x:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8'}},y:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',callback:v=>v.toFixed(1)+'%'}}}}});
+}
+
+// ─── DCF ─────────────────────────────────────────────────────────────────────
+function initDCF(){
+  const cf=currentData.cashflow,q=currentData.quote[0],p=currentData.profile[0];
+  const fcfs=cf.slice(0,5).map(y=>y.freeCashFlow).filter(v=>v!==null&&v!==undefined);
+  const latestFCF=fcfs[0]||1e8;
+  const growths=[];
+  for(let i=0;i<fcfs.length-1;i++){if(fcfs[i+1]&&fcfs[i+1]>0)growths.push((fcfs[i]-fcfs[i+1])/Math.abs(fcfs[i+1])*100)}
+  const avg=growths.length?growths.reduce((a,b)=>a+b,0)/growths.length:10;
+  const g=Math.min(50,Math.max(0,avg));
+  const beta=p?.beta||1.2;
+  const wacc=Math.min(15,Math.max(6,3.5+beta*5.5));
+  document.getElementById('fcfGrowth1').value=Math.round(g);
+  document.getElementById('fcfGrowth1Val').textContent=Math.round(g)+'%';
+  document.getElementById('fcfGrowth2').value=Math.round(g*0.55);
+  document.getElementById('fcfGrowth2Val').textContent=Math.round(g*0.55)+'%';
+  document.getElementById('waccSlider').value=wacc.toFixed(2);
+  document.getElementById('waccVal').textContent=wacc.toFixed(1)+'%';
+  document.getElementById('dcfAutoNote').textContent=`Base FCF: ${fmtBig(latestFCF)} | WACC est. z β=${fmt(beta,2)}`;
+  currentData.baseFCF=latestFCF;
+  currentData.currentPrice=q?.price||0;
+  currentData.sharesOutstanding=q?.sharesOutstanding||(p?.mktCap/q?.price)||1e9;
+  const bal=currentData.balance[0]||{};
+  currentData.netDebt=((bal.longTermDebt||0)+(bal.shortTermDebt||0))-(bal.cashAndCashEquivalents||0);
+  updateDCF();
+}
+
+function setProjPeriod(n){projPeriod=n;document.getElementById('proj5btn').className=n===5?'btn-primary':'btn-secondary';document.getElementById('proj10btn').className=n===10?'btn-primary':'btn-secondary';updateDCF()}
+
+function updateDCF(){
+  if(!currentData.baseFCF&&currentData.baseFCF!==0)return;
+  const g1=parseFloat(document.getElementById('fcfGrowth1').value)/100;
+  const g2=parseFloat(document.getElementById('fcfGrowth2').value)/100;
+  const tgr=parseFloat(document.getElementById('tgrSlider').value)/100;
+  const wacc=parseFloat(document.getElementById('waccSlider').value)/100;
+  const mos=parseFloat(document.getElementById('mosSlider').value)/100;
+  document.getElementById('fcfGrowth1Val').textContent=(g1*100).toFixed(1)+'%';
+  document.getElementById('fcfGrowth2Val').textContent=(g2*100).toFixed(1)+'%';
+  document.getElementById('tgrVal').textContent=(tgr*100).toFixed(1)+'%';
+  document.getElementById('waccVal').textContent=(wacc*100).toFixed(2)+'%';
+  document.getElementById('mosVal').textContent=(mos*100).toFixed(0)+'%';
+  const res=calcDCF(currentData.baseFCF,g1,g2,tgr,wacc,projPeriod);
+  const iv=(res.totalPV-currentData.netDebt)/currentData.sharesOutstanding;
+  const safe=iv*(1-mos);
+  const price=currentData.currentPrice;
+  const upside=((iv-price)/price)*100;
+  document.getElementById('dcfIntrinsic').textContent=iv>0?fmtD(iv):'—';
+  document.getElementById('dcfSafe').textContent=safe>0?fmtD(safe):'—';
+  document.getElementById('dcfUpside').textContent=(upside>0?'+':'')+fmt(upside,1)+'%';
+  document.getElementById('dcfUpside').style.color=upside>0?'var(--green)':'var(--red)';
+  let verdict,vClass;
+  if(upside>40){verdict='SIGNIFICANTLY UNDERVALUED';vClass='verdict-undervalued'}
+  else if(upside>15){verdict='UNDERVALUED';vClass='verdict-undervalued'}
+  else if(upside>-15){verdict='FAIRLY VALUED';vClass='verdict-fair'}
+  else if(upside>-40){verdict='OVERVALUED';vClass='verdict-overvalued'}
+  else{verdict='SIGNIFICANTLY OVERVALUED';vClass='verdict-overvalued'}
+  document.getElementById('dcfVerdict').innerHTML=`<span class="verdict-badge ${vClass}">${verdict}</span>`;
+  currentData.dcfIntrinsic=iv;currentData.dcfUpside=upside;
+  renderFCFChart(res.projectedFCFs);renderSensitivity(g1,g2,tgr,wacc);renderFinalScorecard();
+}
+
+function calcDCF(baseFCF,g1,g2,tgr,wacc,years){
+  let fcf=Math.abs(baseFCF)||1e8,totalPV=0;
+  const projectedFCFs=[];
+  for(let t=1;t<=years;t++){
+    const g=t<=5?g1:g2;fcf=fcf*(1+g);
+    const pv=fcf/Math.pow(1+wacc,t);totalPV+=pv;projectedFCFs.push({year:t,fcf,pv});
+  }
+  const tv=(fcf*(1+tgr))/(wacc-tgr);
+  totalPV+=tv/Math.pow(1+wacc,years);
+  return{totalPV,projectedFCFs};
+}
+
+function renderFCFChart(proj){
+  if(fcfChartInst)fcfChartInst.destroy();
+  fcfChartInst=new Chart(document.getElementById('fcfChart'),{type:'bar',data:{labels:proj.map(d=>'Y'+d.year),datasets:[{label:'Projected FCF',data:proj.map(d=>d.fcf/1e9),backgroundColor:'rgba(79,142,247,.6)',borderColor:'#4f8ef7',borderWidth:1},{label:'PV of FCF',data:proj.map(d=>d.pv/1e9),backgroundColor:'rgba(0,208,132,.3)',borderColor:'#00d084',borderWidth:1}]},options:{responsive:true,plugins:{legend:{labels:{color:'#9090b8',font:{size:10}}}},scales:{x:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',font:{size:10}}},y:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',callback:v=>'$'+v.toFixed(1)+'B'}}}}});
+}
+
+function renderSensitivity(g1,g2,tgr,wacc){
+  const price=currentData.currentPrice;
+  const ws=[-0.02,-0.01,0,0.01,0.02].map(d=>wacc+d);
+  const ts=[-0.01,-0.005,0,0.005,0.01].map(d=>tgr+d);
+  let html='<table class="sensitivity-table"><thead><tr><th>WACC \\ TGR</th>';
+  ts.forEach(t=>html+=`<th>${(t*100).toFixed(1)}%</th>`);
+  html+='</tr></thead><tbody>';
+  ws.forEach(w=>{
+    if(w<=0)return;
+    html+=`<tr><td class="row-header">${(w*100).toFixed(1)}%</td>`;
+    ts.forEach(t=>{
+      if(w<=t){html+='<td style="color:var(--text2)">N/A</td>';return}
+      const res=calcDCF(currentData.baseFCF,g1,g2,t,w,projPeriod);
+      const iv=(res.totalPV-currentData.netDebt)/currentData.sharesOutstanding;
+      const up=((iv-price)/price)*100;
+      const int=Math.min(1,Math.abs(up)/60);
+      const bg=up>20?`rgba(0,208,132,${.1+int*.4})`:up>0?`rgba(0,208,132,${.05+int*.2})`:up>-20?`rgba(255,179,71,${.05+int*.2})`:`rgba(255,77,109,${.1+int*.3})`;
+      html+=`<td style="background:${bg}">${iv>0?'$'+fmt(iv,0):'—'}</td>`;
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('sensitivityTable').innerHTML=html;
+}
+
+// ─── MULTIPLES ────────────────────────────────────────────────────────────────
+function initMultiples(){
+  const q=currentData.quote[0],inc=currentData.income[0]||{},cf=currentData.cashflow[0]||{},r=currentData.ratios[0]||{};
+  const shares=currentData.sharesOutstanding||1;
+  document.getElementById('epsInput').value=fmt(q?.eps||inc.eps||0,2);
+  document.getElementById('ebitdaInput').value=inc.ebitda?Math.round(inc.ebitda/1e6):'';
+  document.getElementById('netDebtInput').value=currentData.netDebt?Math.round(currentData.netDebt/1e6):'';
+  document.getElementById('fcfPerShareInput').value=cf.freeCashFlow?fmt(cf.freeCashFlow/shares,2):'';
+  if(r.priceEarningsRatio)document.getElementById('targetPE').value=Math.min(40,Math.max(10,Math.round(r.priceEarningsRatio*.85)));
+  updateMultiples();
+}
+
+function updateMultiples(){
+  const eps=parseFloat(document.getElementById('epsInput').value)||0;
+  const tPE=parseFloat(document.getElementById('targetPE').value)||20;
+  const ebitda=parseFloat(document.getElementById('ebitdaInput').value)*1e6||0;
+  const tEV=parseFloat(document.getElementById('targetEVEBITDA').value)||15;
+  const netDebt=parseFloat(document.getElementById('netDebtInput').value)*1e6||0;
+  const fcfPS=parseFloat(document.getElementById('fcfPerShareInput').value)||0;
+  const tPFCF=parseFloat(document.getElementById('targetPFCF').value)||22;
+  const shares=currentData.sharesOutstanding||1;
+  const peVal=eps*tPE;
+  const evVal=ebitda?((ebitda*tEV)-netDebt)/shares:0;
+  const pfcfVal=fcfPS*tPFCF;
+  document.getElementById('peValue').textContent=peVal>0?fmtD(peVal):'—';
+  document.getElementById('evEbitdaValue').textContent=evVal>0?fmtD(evVal):'—';
+  document.getElementById('pfcfValue').textContent=pfcfVal>0?fmtD(pfcfVal):'—';
+  const price=currentData.currentPrice;
+  const dcf=currentData.dcfIntrinsic||0;
+  const methods=[{label:'DCF',value:dcf},{label:'P/E',value:peVal},{label:'EV/EBITDA',value:evVal},{label:'P/FCF',value:pfcfVal}].filter(m=>m.value>0);
+  const blended=methods.length?methods.reduce((a,b)=>a+b.value,0)/methods.length:0;
+  const bUp=blended&&price?((blended-price)/price)*100:0;
+  currentData.blendedValue=blended;currentData.blendedUpside=bUp;
+  document.getElementById('multiplesTable').innerHTML=methods.map(m=>`<div class="stat-row"><span class="stat-key">${m.label}</span><span class="stat-val" style="color:${m.value>price?'var(--green)':'var(--red)'}">${fmtD(m.value)}</span></div>`).join('')+`<div class="stat-row"><span class="stat-key" style="color:var(--text)"><strong>Current Price</strong></span><span class="stat-val">${fmtD(price)}</span></div>`;
+  if(blended>0){const c=bUp>0?'var(--green)':'var(--red)';document.getElementById('blendedResult').innerHTML=`<div class="dcf-label">Blended Fair Value</div><div class="dcf-value" style="color:${c}">${fmtD(blended)}</div><div style="color:${c};font-size:.85rem;margin-top:4px">${bUp>0?'+':''}${fmt(bUp,1)}% vs current price</div>`}
+  renderMultiplesChart(methods,price);renderFinalScorecard();
+}
+
+function renderMultiplesChart(methods,price){
+  if(multiplesChartInst)multiplesChartInst.destroy();
+  const all=[...methods,{label:'Current',value:price}];
+  multiplesChartInst=new Chart(document.getElementById('multiplesChart'),{type:'bar',data:{labels:all.map(m=>m.label),datasets:[{data:all.map(m=>m.value),backgroundColor:all.map(m=>m.label==='Current'?'rgba(255,179,71,.6)':m.value>price?'rgba(0,208,132,.6)':'rgba(255,77,109,.4)'),borderColor:all.map(m=>m.label==='Current'?'#ffb347':m.value>price?'#00d084':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8'}},y:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',callback:v=>'$'+v.toFixed(0)}}}}});
+}
+
+// ─── RISK ─────────────────────────────────────────────────────────────────────
+function renderRisk(){
+  const r=currentData.ratios[0]||{},inc=currentData.income[0]||{},incP=currentData.income[1]||{};
+  const bal=currentData.balance[0]||{},balP=currentData.balance[1]||{},cf=currentData.cashflow[0]||{};
+  const q=currentData.quote[0],p=currentData.profile[0];
+  const ta=bal.totalAssets||1,wc=(bal.totalCurrentAssets||0)-(bal.totalCurrentLiabilities||0);
+  const z=(1.2*wc/ta)+(1.4*(bal.retainedEarnings||0)/ta)+(3.3*(inc.operatingIncome||0)/ta)+(0.6*(q?.marketCap||0)/(bal.totalLiabilities||1))+(1.0*(inc.revenue||0)/ta);
+  document.getElementById('altmanScore').textContent=fmt(z,2);
+  let zB,zD,zC;
+  if(z>=2.99){zB='SAFE ZONE';zC='var(--green)';zD='Low bankruptcy risk.'}
+  else if(z>=1.81){zB='GREY ZONE';zC='var(--amber)';zD='Moderate risk. Monitor closely.'}
+  else{zB='DISTRESS ZONE';zC='var(--red)';zD='Elevated bankruptcy risk. High caution.'}
+  document.getElementById('altmanBadge').innerHTML=`<span class="verdict-badge" style="background:${zC}22;color:${zC};border:1px solid ${zC}">${zB}</span>`;
+  document.getElementById('altmanDesc').textContent=zD;
+  document.getElementById('altmanScore').style.color=zC;
+  currentData.altmanZ=z;
+  const netInc=inc.netIncome||0,cfo=cf.operatingCashFlow||0;
+  const roa=ta?netInc/ta:0,roaP=(balP.totalAssets||1)?(incP.netIncome||0)/(balP.totalAssets||1):0;
+  const lev=ta?(bal.longTermDebt||0)/ta:0,levP=(balP.totalAssets||1)?(balP.longTermDebt||0)/(balP.totalAssets||1):0;
+  const cr=r.currentRatio||0,crP=(balP.totalCurrentLiabilities||1)?(balP.totalCurrentAssets||0)/(balP.totalCurrentLiabilities||1):0;
+  const gm=inc.revenue?(inc.grossProfit||0)/inc.revenue:0,gmP=(incP.revenue||1)?(incP.grossProfit||0)/(incP.revenue||1):0;
+  const at=ta?(inc.revenue||0)/ta:0,atP=(balP.totalAssets||1)?(incP.revenue||0)/(balP.totalAssets||1):0;
+  const crit=[
+    {l:'Positive ROA',p:roa>0},{l:'Positive Operating Cash Flow',p:cfo>0},{l:'Increasing ROA',p:roa>roaP},
+    {l:'CFO > Net Income',p:cfo>netInc},{l:'Decreasing Leverage',p:lev<levP},{l:'Increasing Current Ratio',p:cr>crP},
+    {l:'No New Share Dilution',p:(bal.commonStock||0)<=(balP.commonStock||0)+1e6},{l:'Improving Gross Margin',p:gm>gmP},{l:'Improving Asset Turnover',p:at>atP}
+  ];
+  const fs=crit.filter(c=>c.p).length;
+  document.getElementById('piotroskiScore').textContent=fs;
+  let fB,fC;
+  if(fs>=7){fB='STRONG';fC='var(--green)'}else if(fs>=4){fB='AVERAGE';fC='var(--amber)'}else{fB='WEAK';fC='var(--red)'}
+  document.getElementById('piotroskiBadge').innerHTML=`<span class="verdict-badge" style="background:${fC}22;color:${fC};border:1px solid ${fC}">${fB} (${fs}/9)</span>`;
+  document.getElementById('piotroskiList').innerHTML=crit.map(c=>`<div class="check-item"><div class="check-dot ${c.p?'pass':'fail'}"></div><span>${c.l}</span></div>`).join('');
+  currentData.piotroski=fs;
+  const beta=p?.beta||1,deq=r.debtEquityRatio||0,ic=r.interestCoverage||999;
+  const fcfConv=netInc&&cf.freeCashFlow?cf.freeCashFlow/netInc:null;
+  document.getElementById('riskFlags').innerHTML=[
+    {l:'Beta (Market Risk)',v:fmt(beta,2),s:beta<1?'low':beta<1.5?'medium':'high',n:beta<1?'Low volatility vs market':beta<1.5?'Moderate sensitivity':'High volatility'},
+    {l:'Debt/Equity',v:fmt(deq,2),s:deq<0.5?'low':deq<2?'medium':'high',n:deq<0.5?'Conservative leverage':deq<2?'Moderate leverage':'High leverage'},
+    {l:'Interest Coverage',v:ic===999?'N/A':fmt(ic,1)+'×',s:ic>10?'low':ic>3?'medium':'high',n:ic>10?'Strong debt service':ic>3?'Adequate':'Risk — low coverage'},
+    {l:'FCF Conversion',v:fcfConv!==null?fmtPct(fcfConv):'N/A',s:!fcfConv||fcfConv>0.7?'low':fcfConv>0.4?'medium':'high',n:!fcfConv?'No data':fcfConv>0.7?'High quality earnings':'Earnings quality issue'}
+  ].map(f=>{const c={low:'var(--green)',medium:'var(--amber)',high:'var(--red)'}[f.s];return`<div class="stat-row"><div><div style="font-size:.82rem">${f.l}</div><div style="font-size:.7rem;color:var(--text2);margin-top:2px">${f.n}</div></div><span class="stat-val" style="color:${c}">${f.v}</span></div>`}).join('');
+  let rs=0;
+  if(beta>1.5)rs+=25;else if(beta>1)rs+=12;
+  if(deq>2)rs+=25;else if(deq>0.8)rs+=12;
+  if(z<1.81)rs+=25;else if(z<2.99)rs+=12;
+  if(fs<4)rs+=25;else if(fs<7)rs+=12;
+  rs=Math.min(100,rs);currentData.riskScore=rs;
+  document.getElementById('riskFill').style.width=rs+'%';
+  let rR,rC;
+  if(rs<25){rR='LOW RISK';rC='var(--green)'}else if(rs<50){rR='MEDIUM RISK';rC='var(--amber)'}else if(rs<75){rR='HIGH RISK';rC='var(--red)'}else{rR='VERY HIGH RISK';rC='var(--red)'}
+  document.getElementById('riskRatingBadge').innerHTML=`<span class="verdict-badge" style="background:${rC}22;color:${rC};border:1px solid ${rC}">${rR}</span>`;
+  document.getElementById('qualitativeChecklist').innerHTML='<div style="font-size:.75rem;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">Kvalitatívny checklist (manuálny)</div>'+['Competitive moat identified','Management track record positive','Insider ownership >5%','No significant regulatory risk','Geographic diversification adequate','No major ongoing litigation'].map((item,i)=>`<div class="check-item"><input type="checkbox" id="q${i}" style="accent-color:var(--blue);width:14px;height:14px;cursor:pointer"><label for="q${i}" style="cursor:pointer;font-size:.82rem">${item}</label></div>`).join('');
+  renderFinalScorecard();
+}
+
+// ─── DECISION ─────────────────────────────────────────────────────────────────
+function renderDecision(){setHorizon(5)}
+function setHorizon(n){horizon=n;['3','5','10'].forEach(x=>document.getElementById('h'+x+'btn').className=String(n)===x?'btn-primary':'btn-secondary');updateScenarios()}
+
+function updateScenarios(){
+  const price=currentData.currentPrice;
+  const hurdle=parseFloat(document.getElementById('hurdleRate').value)/100||0.10;
+  const bear=price*Math.pow(1+(hurdle-0.05),horizon);
+  const base=price*Math.pow(1+hurdle,horizon);
+  const bull=price*Math.pow(1+(hurdle+0.06),horizon);
+  const exp=0.25*bear+0.50*base+0.25*bull;
+  currentData.bearCase=bear;currentData.baseCase=base;currentData.bullCase=bull;
+  document.getElementById('scenarioCards').innerHTML=`
+    <div class="scenario-card bear"><div class="scenario-label" style="color:var(--red)">🐻 Bear</div><div class="scenario-price" style="color:var(--red)">${fmtD(bear)}</div><div class="scenario-return">${((hurdle-.05)*100).toFixed(1)}% CAGR</div><div class="scenario-return" style="color:var(--red)">${fmt((bear/price-1)*100,0)}% total</div></div>
+    <div class="scenario-card base"><div class="scenario-label" style="color:var(--amber)">📊 Base</div><div class="scenario-price" style="color:var(--amber)">${fmtD(base)}</div><div class="scenario-return">${(hurdle*100).toFixed(1)}% CAGR</div><div class="scenario-return" style="color:var(--amber)">+${fmt((base/price-1)*100,0)}% total</div></div>
+    <div class="scenario-card bull"><div class="scenario-label" style="color:var(--green)">🐂 Bull</div><div class="scenario-price" style="color:var(--green)">${fmtD(bull)}</div><div class="scenario-return">${((hurdle+.06)*100).toFixed(1)}% CAGR</div><div class="scenario-return" style="color:var(--green)">+${fmt((bull/price-1)*100,0)}% total</div></div>
+  `;
+  renderScenarioChart(price,bear,base,bull,exp);
+  renderFinalScorecard();
+}
+
+function renderScenarioChart(price,bear,base,bull,exp){
+  if(scenarioChartInst)scenarioChartInst.destroy();
+  const labels=['Now',...Array.from({length:horizon},(_,i)=>'Y'+(i+1))];
+  const mk=(s,e,n)=>Array.from({length:n+1},(_,i)=>s*Math.pow(e/s,i/n));
+  scenarioChartInst=new Chart(document.getElementById('scenarioChart'),{type:'line',data:{labels,datasets:[{label:'Bull',data:mk(price,bull,horizon),borderColor:'#00d084',borderWidth:2,pointRadius:0,fill:false,tension:.3},{label:'Base',data:mk(price,base,horizon),borderColor:'#ffb347',borderWidth:2,pointRadius:0,fill:false,tension:.3},{label:'Bear',data:mk(price,bear,horizon),borderColor:'#ff4d6d',borderWidth:2,pointRadius:0,fill:false,tension:.3},{label:'Expected',data:mk(price,exp,horizon),borderColor:'#4f8ef7',borderWidth:2,borderDash:[4,4],pointRadius:0,fill:false,tension:.3}]},options:{responsive:true,plugins:{legend:{labels:{color:'#9090b8',font:{size:10}}}},scales:{x:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',font:{size:10}}},y:{grid:{color:'#1e1e3f'},ticks:{color:'#9090b8',callback:v=>'$'+v.toFixed(0)}}}}});
+}
+
+function renderFinalScorecard(){
+  const r=currentData.ratios?.[0]||{},p=currentData.profile?.[0]||{},inc=currentData.income?.[0]||{};
+  const price=currentData.currentPrice;
+  const upside=currentData.dcfUpside||0;
+  const valScore=Math.min(30,Math.max(0,Math.round(15+upside*0.3)));
+  const qs=calcQualityScore(r,p);
+  const qualScore=Math.round((qs.total/100)*25);
+  const rs=currentData.riskScore!==undefined?currentData.riskScore:50;
+  const riskPts=Math.round((1-rs/100)*25);
+  const incs=currentData.income;
+  let revG=0;
+  if(incs&&incs.length>=2&&incs[1].revenue)revG=(incs[0].revenue-incs[1].revenue)/Math.abs(incs[1].revenue)*100;
+  const growthScore=Math.min(20,Math.max(0,Math.round(revG*0.5)));
+  const total=valScore+qualScore+riskPts+growthScore;
+  let grade,rec,recC;
+  if(total>=80){grade='A';rec='STRONG BUY';recC='var(--green)'}
+  else if(total>=70){grade='B+';rec='BUY';recC='var(--green)'}
+  else if(total>=55){grade='B';rec='WATCH';recC='var(--amber)'}
+  else if(total>=40){grade='C';rec='CAUTIOUS';recC='var(--amber)'}
+  else{grade='D';rec='AVOID';recC='var(--red)'}
+  currentData.grade=grade;currentData.rec=rec;
+  document.getElementById('gradeDisplay').textContent=grade;
+  document.getElementById('recommendationBadge').innerHTML=`<span class="verdict-badge" style="background:${recC}22;color:${recC};border:1px solid ${recC};font-size:.9rem">${rec}</span>`;
+  document.getElementById('rationaleText').textContent=`${currentData.ticker} dosiahol ${total}/100 (${grade}). Valuácia: DCF naznačuje ${upside>0?'upside':'downside'} ${Math.abs(fmt(upside,0))}% (${valScore}/30). Kvalita biznisu: ${qs.total}/100 (${qualScore}/25). Riziko: ${rs<25?'nízke':rs<50?'stredné':'vysoké'} (${riskPts}/25). Revenue rast ${fmt(revG,1)}% YoY (${growthScore}/20). ${rec==='STRONG BUY'||rec==='BUY'?'Akcia vyzerá atraktívne ocenená so solídnymi fundamentmi.':rec==='WATCH'?'Zvaž pridanie pri poklese alebo lepšom margin of safety.':'Pristupuj s opatrnosťou — hľadaj lepšie alternatívy.'}`;
+  document.getElementById('scoreBarItems').innerHTML=[['Valuation Score',valScore,30],['Quality Score',qualScore,25],['Risk Score',riskPts,25],['Growth Score',growthScore,20],['TOTAL',total,100]].map(([l,v,max])=>`<div class="score-bar-item"><div class="score-bar-header"><span style="color:${l==='TOTAL'?'var(--text)':'var(--text2)'};font-size:.8rem;font-weight:${l==='TOTAL'?700:400}">${l}</span><span style="font-family:var(--mono);font-size:.8rem;font-weight:${l==='TOTAL'?700:400}">${v}/${max}</span></div><div class="score-bar-track" style="height:${l==='TOTAL'?8:5}px"><div class="score-bar-fill" style="width:${(v/max)*100}%"></div></div></div>`).join('');
+}
+
+function copyToClipboard(){
+  const d=currentData;
+  const txt=`===== EQUITY LENS — INVESTMENT SUMMARY =====\nTicker: ${d.ticker}\nCompany: ${d.profile?.[0]?.companyName||'—'}\nDate: ${new Date().toLocaleDateString()}\n\nPRICE: $${fmt(d.currentPrice)}\nMARKET CAP: ${fmtBig(d.quote?.[0]?.marketCap)}\nSECTOR: ${d.profile?.[0]?.sector||'—'}\n\n--- VALUATION ---\nDCF Intrinsic Value: ${fmtD(d.dcfIntrinsic)}\nDCF Upside: ${fmt(d.dcfUpside,1)}%\nBlended Fair Value: ${fmtD(d.blendedValue)}\n\n--- RISK ---\nAltman Z-Score: ${fmt(d.altmanZ,2)}\nPiotroski F-Score: ${d.piotroski}/9\n\n--- VERDICT ---\nGrade: ${d.grade} | ${d.rec}\n\n⚠️ Not financial advice.`;
+  navigator.clipboard.writeText(txt).then(()=>alert('Skopírované!'));
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+updateApiStatus();
+renderRecent();
+</script>
+</body>
+</html>
