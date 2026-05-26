@@ -406,7 +406,8 @@ function setMode(m){
   document.getElementById('liveModeBtn').className='mode-btn live'+(USE_LIVE?' active':'');
   const ib=document.getElementById('infoBar');
   if(USE_LIVE){ib.className='info-bar live';ib.innerHTML='🟢 <strong>Live API mode</strong> — Alpha Vantage reálne dáta. Zadaj akýkoľvek ticker (NYSE/NASDAQ/EBS/AMS...).'}
-  else{ib.className='info-bar';ib.innerHTML='📊 <strong>Demo režim</strong> — Tvoje portfólio + top stocks: AAPL · MSFT · GOOG · NVDA · AMZN · AVGO · MA · V · <strong>BAM · MELI · ASML · ABBV · META · SMH</strong>. Pre akýkoľvek iný ticker: vlož Alpha Vantage API key.''}
+  else{ib.className='info-bar';ib.innerHTML='📊 <strong>Demo režim</strong> — Tvoje portfólio: AAPL · MSFT · GOOG · NVDA · AMZN · AVGO · MA · V · BAM · MELI · ASML · ABBV · META · SMH. Pre live dáta vlož Alpha Vantage API key.'}
+
 }
 
 // ─── RECENT ───────────────────────────────────────────────────────────────────
